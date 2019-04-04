@@ -7,9 +7,9 @@ import pytest
 
 from click.testing import CliRunner
 
-from hothouse import hothouse
+import hothouse
 from hothouse import cli
-
+from hothouse.datasets import PLANTS
 
 @pytest.fixture
 def response():
@@ -36,3 +36,8 @@ def test_command_line_interface():
     help_result = runner.invoke(cli.main, ['--help'])
     assert help_result.exit_code == 0
     assert '--help  Show this message and exit.' in help_result.output
+
+def test_load_soy():
+    fname = PLANTS.fetch('fullSoy_2-12a.ply')
+    p = hothouse.plant_model.PlantModel.from_ply(fname)
+    assert p.triangles.shape == (3, 3, 8584)

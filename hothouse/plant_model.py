@@ -21,7 +21,7 @@ class PlantModel:
         for face in faces:
             indices = face[0]
             vert = vertices[indices]
-            triangles.append(np.array(vert['x'], vert['y'], vert['z']))
+            triangles.append(np.array([vert['x'], vert['y'], vert['z']]))
         triangles = np.array(triangles).swapaxes(0,2)
         obj = cls(triangles, origin, axial_rotation)
         return obj

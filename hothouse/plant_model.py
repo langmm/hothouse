@@ -8,7 +8,7 @@ class PlantModel(Model):
     axial_rotation = None
 
     def __init__(self, triangles, origin = (0.0, 0.0, 0.0), axial_rotation = 0.0):
-        self.triangles = triangles + np.array(origin)[None, :, None] # copy
+        self.triangles = triangles + np.array(origin)[None, None, :] # copy
         self.origin = origin
         self.axial_rotation = axial_rotation
         # TODO: implement axial rotation

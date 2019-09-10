@@ -1,0 +1,14 @@
+models:
+  - name: make_orthographic
+    language: python
+    args: ./simple_ygg.py
+    function: make_image
+    inputs: input_parameters
+    outputs: output_image
+connections:
+  - input: input_vector_info.json
+    filetype: json
+    output: input_parameters
+  - input: output_image
+    output: image.pkl
+    filetype: pickle

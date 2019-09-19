@@ -8,9 +8,9 @@ class RayBlaster:
     def __init__(self):
         pass
 
-    def cast_once(self, scene):
+    def cast_once(self, scene, verbose_output = False):
         output = scene.embree_scene.run(
-            self.origins, self.directions, query="DISTANCE", output=0
+            self.origins, self.directions, query="DISTANCE", output=verbose_output
         )
         return output
 

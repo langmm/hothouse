@@ -1,6 +1,28 @@
 from plyfile import PlyData, PlyElement
 import numpy as np
 from .model import Model
+from itertools import tee
+
+# From itertools cookbook
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = tee(iterable)
+    next(b, None)
+    return zip(a, b)
+
+def _ensure_triangulated(faces):
+    for face in faces:
+        if len(face[0]) == 3:
+            yield face
+            continue
+        # We are going to make the assumption that the face is convex
+        # We choose the first vertex as our fan source
+        indices, *rest = face
+        base = indices[0]
+        for pair in pairwise(indices[1:]):
+            yield [np.array((base,) + pair)] + rest
+
+
 
 
 class PlantModel(Model):
@@ -34,7 +56,7 @@ class PlantModel(Model):
         vertices = plydata["vertex"][:]
         faces = plydata["face"][:]
         triangles = []
-        for face in faces:
+        for face in _ensure_triangulated(faces):
             indices = face[0]
             vert = vertices[indices]
             triangles.append(np.array([vert["x"], vert["y"], vert["z"]]))

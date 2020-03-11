@@ -10,7 +10,8 @@ class RayBlaster:
 
     def cast_once(self, scene, verbose_output = False):
         output = scene.embree_scene.run(
-            self.origins, self.directions, query="DISTANCE", output=verbose_output
+                                        self.origins, self.directions, query="DISTANCE", output=verbose_output
+                                        #self.origins, self.directions, query="INTERSECT", output=verbose_output
         )
         return output
 
@@ -29,6 +30,7 @@ class OrthographicRayBlaster(RayBlaster):
         self.height = height
         self.nx = nx
         self.ny = ny
+        
         # here origin is not the center, but the bottom left
         self._directions = np.zeros((nx, ny, 3), dtype="f4")
         self._directions[:] = self.forward[None, None, :]
@@ -44,7 +46,6 @@ class OrthographicRayBlaster(RayBlaster):
             + offset_y[..., None] * self.up
         )
         self.origins = self._origins.view().reshape((nx * ny, 3))
-
 
 class ProjectionRayBlaster(RayBlaster):
     pass

@@ -30,10 +30,11 @@ class PlantModel(Model):
     origin = None
     axial_rotation = None
 
-    def __init__(self, triangles, origin=(0.0, 0.0, 0.0), axial_rotation=0.0):
+    def __init__(self, triangles, origin=(0.0, 0.0, 0.0), axial_rotation=0.0,
+                 vertices = None, indices = None, colors = None):
         """
-            Axial rotation should be in radians
-            """
+        Axial rotation should be in radians
+        """
         triangles = triangles + np.array(origin)[None, None, :]  # copy
         if axial_rotation != 0.0:
             # x' = x*cos q - y*sin q
@@ -42,12 +43,15 @@ class PlantModel(Model):
             new_triangles = triangles.copy()
             new_triangles[:,:,0] = (np.cos(axial_rotation) * triangles[:,:,0]
                                     - np.sin(axial_rotation) * triangles[:,:,1])
-                                    new_triangles[:,:,1] = (np.sin(axial_rotation) * triangles[:,:,0]
-                                                            - np.cos(axial_rotation) * triangles[:,:,1])
-                                    triangles = new_triangles
+            new_triangles[:,:,1] = (np.sin(axial_rotation) * triangles[:,:,0]
+                                    - np.cos(axial_rotation) * triangles[:,:,1])
+            triangles = new_triangles
         self.triangles = triangles
         self.origin = origin
         self.axial_rotation = axial_rotation
+        self.vertices = vertices
+        self.indices = indices
+        self.colors = colors
 
     @classmethod
     def from_ply(cls, filename, origin=(0.0, 0.0, 0.0), axial_rotation=0.0):
@@ -56,16 +60,22 @@ class PlantModel(Model):
         vertices = plydata["vertex"][:]
         faces = plydata["face"][:]
         triangles = []
+        xyz_faces = []
         for face in _ensure_triangulated(faces):
             indices = face[0]
             vert = vertices[indices]
             triangles.append(np.array([vert["x"], vert["y"], vert["z"]]))
+            xyz_faces.append(indices)
 
+        xyz_vert = np.stack([vertices[ax] for ax in 'xyz'], axis=-1)
+        xyz_faces = np.concatenate(xyz_faces)
+        colors = np.stack([vertices["diffuse_{}".format(c)]
+                           for c in ("red", "green", "blue")], axis=-1)
         triangles = np.array(triangles).swapaxes(1, 2)
-        obj = cls(triangles, origin, axial_rotation)
+        obj = cls(triangles, origin, axial_rotation,
+                  vertices = xyz_vert, indices = xyz_faces,
+                  colors = colors)
 
-        print(vert)
-        print(vert.shape)
         return obj
 
     def clone(self, origin=(0.0, 0.0, 0.0), axial_rotation=0.0):
@@ -78,3 +88,33 @@ class PlantModel(Model):
         return PlantModel(
             self.triangles.copy(), origin=origin, axial_rotation=axial_rotation
         )
+
+    def _ipython_display_(self):
+        # This needs to actually display, which is not the same as returning a display.
+        import pythreejs
+        from IPython.core.display import display
+        plantgeometry = pythreejs.BufferGeometry(attributes=dict(
+            position=pythreejs.BufferAttribute(self.vertices, normalized=False),
+            index=pythreejs.BufferAttribute(self.indices.ravel(order="C").astype("u4"),
+                                            normalized=False),
+            color=pythreejs.BufferAttribute(self.colors),
+        ))
+        plantgeometry.exec_three_obj_method('computeFaceNormals')
+        mat = pythreejs.MeshStandardMaterial(vertexColors='VertexColors', side='DoubleSide')
+        myobjectCube = pythreejs.Mesh(
+            geometry=plantgeometry,
+            material=mat,
+            position=[0,0,0]   # Center the cube
+        )
+        cCube = pythreejs.PerspectiveCamera(
+            position=[25, 35, 100], fov=20,
+            #children=[pythreejs.DirectionalLight(color='#ffffff', position=[100, 100, 100], intensity=0.5)])
+            children=[pythreejs.AmbientLight()]
+        )
+        sceneCube = pythreejs.Scene(children=[myobjectCube, cCube, pythreejs.AmbientLight(color='#dddddd')])
+
+        rendererCube = pythreejs.Renderer(camera=cCube, background='white', background_opacity=1,
+                                scene = sceneCube, controls=[pythreejs.OrbitControls(controlling=cCube)],
+                                         width=800, height=800)
+
+        display(rendererCube)

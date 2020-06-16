@@ -3,6 +3,7 @@ import traittypes
 import traitlets
 from itertools import tee
 import quaternion
+import pythreejs
 
 from plyfile import PlyData, PlyElement
 
@@ -30,12 +31,22 @@ def _ensure_triangulated(faces):
 
 
 class Model(traitlets.HasTraits):
-    origin = traittypes.Array().valid(check_shape(3), check_dtype("f8"))
-    vertices = traittypes.Array().valid(check_shape(None, 3), check_dtype("f8"))
-    indices = traittypes.Array().valid(check_shape(None, 3), check_dtype("i8"))
+    origin = traittypes.Array(None, allow_none=True).valid(
+        check_shape(3), check_dtype("f4")
+    )
+    vertices = traittypes.Array(None, allow_none=True).valid(
+        check_shape(None, 3), check_dtype("f4")
+    )
+    indices = traittypes.Array(None, allow_none=True).valid(
+        check_shape(None, 3), check_dtype("i4")
+    )
+    attributes = traittypes.Array(None, allow_none=True)
+    triangles = traittypes.Array(None, allow_none=True).valid(
+        check_shape(None, 3, 3), check_dtype("f4")
+    )
 
     @classmethod
-    def from_ply(cls, filename, origin=(0.0, 0.0, 0.0), axial_rotation=0.0):
+    def from_ply(cls, filename):
         # This is probably not the absolute best way to do this.
         plydata = PlyData.read(filename)
         vertices = plydata["vertex"][:]
@@ -49,22 +60,34 @@ class Model(traitlets.HasTraits):
             xyz_faces.append(indices)
 
         xyz_vert = np.stack([vertices[ax] for ax in "xyz"], axis=-1)
-        xyz_faces = np.concatenate(xyz_faces)
+        xyz_faces = np.stack(xyz_faces)
         colors = np.stack(
             [vertices["diffuse_{}".format(c)] for c in ("red", "green", "blue")],
             axis=-1,
         )
         triangles = np.array(triangles).swapaxes(1, 2)
         obj = cls(
-            triangles,
-            origin,
-            axial_rotation,
             vertices=xyz_vert,
             indices=xyz_faces,
-            colors=colors,
+            attributes=colors,
+            triangles=triangles,
         )
 
         return obj
+
+    @property
+    def geometry(self):
+        attributes = dict(
+            position=pythreejs.BufferAttribute(self.vertices, normalized=False),
+            index=pythreejs.BufferAttribute(
+                self.indices.ravel(order="C").astype("u4"), normalized=False
+            ),
+        )
+        if self.attributes is not None:
+            attributes["attributes"] = pythreejs.BufferAttribute(self.attributes)
+        geometry = pythreejs.BufferGeometry(attributes=attributes)
+        geometry.exec_three_obj_method("computeFaceNormals")
+        return geometry
 
     def translate(self, delta):
         self.vertices = self.vertices + delta

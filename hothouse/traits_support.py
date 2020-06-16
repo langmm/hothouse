@@ -5,14 +5,18 @@ import traitlets
 
 def check_shape(*dimensions):
     def validator(trait, value):
+        if value is None:
+            return value
         if len(value.shape) != len(dimensions):
             raise traitlets.TraitError(
-                f"Expected rank {len(dimensions)} but got " f"rank {len(value.shape)}"
+                f"{trait.name}: expected rank {len(dimensions)} but got "
+                f"rank {len(value.shape)}"
             )
         for a, b in zip(value.shape, dimensions):
             if b is not None and a != b:
                 raise traitlets.TraitError(
-                    f"Expected shape of {dimensions} but got " f"shape of {value.shape}"
+                    f"{trait.name}: expected shape of {dimensions} but got "
+                    f"shape of {value.shape}"
                 )
         return value
 
@@ -21,9 +25,11 @@ def check_shape(*dimensions):
 
 def check_dtype(dtype):
     def validator(trait, value):
+        if value is None:
+            return value
         if value.dtype != dtype:
             raise traitlets.TraitError(
-                f"Expected dtype {dtype} but got " f"{value.dtype}"
+                f"{trait.name}: expected dtype {dtype} but got " f"{value.dtype}"
             )
         return value
 

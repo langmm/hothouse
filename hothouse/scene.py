@@ -30,7 +30,7 @@ class Scene(traitlets.HasTraits):
             position=[25, 35, 100], fov=20, children=[pythreejs.AmbientLight()],
         )
         children = [cam, pythreejs.AmbientLight(color="#dddddd")]
-        material = pythreejs.MeshStandardMaterial(
+        material = pythreejs.MeshBasicMaterial(
             color="#ff0000", vertexColors="VertexColors", side="DoubleSide"
         )
         for model in self.components:

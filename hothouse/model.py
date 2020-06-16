@@ -84,7 +84,7 @@ class Model(traitlets.HasTraits):
             ),
         )
         if self.attributes is not None:
-            attributes["attributes"] = pythreejs.BufferAttribute(self.attributes)
+            attributes["color"] = pythreejs.BufferAttribute(self.attributes)
         geometry = pythreejs.BufferGeometry(attributes=attributes)
         geometry.exec_three_obj_method("computeFaceNormals")
         return geometry

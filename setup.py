@@ -19,9 +19,10 @@ requirements = [
     "pooch>=0.3.1",
     "plyfile>=0.7",
     "numpy>=1.13.0",
-    "numpy-quaternion",
     "traitlets",
     "traittypes",
+    "pysolar>=0.8",
+    "pythreejs",
 ]
 
 setup_requirements = [

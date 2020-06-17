@@ -1,5 +1,6 @@
 import traitlets
 import pythreejs
+import numpy as np
 from IPython.core.display import display
 
 from .model import Model
@@ -23,6 +24,16 @@ class Scene(traitlets.HasTraits):
     def add_component(self, component):
         self.components = self.components + [component]  # Force traitlet update
         self.meshes.append(TriangleMesh(self.embree_scene, component.triangles))
+
+    def compute_hit_count(self, blaster):
+        output = blaster.compute_count(self)
+        component_counts = {}
+        for ci, component in enumerate(self.components):
+            hits = output["primID"][output["geomID"] == ci]
+            component_counts[ci] = np.bincount(
+                hits[hits >= 0], minlength=component.triangles.shape[0]
+            )
+        return component_counts
 
     def _ipython_display_(self):
         # This needs to actually display, which is not the same as returning a display.

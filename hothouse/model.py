@@ -85,6 +85,10 @@ class Model(traitlets.HasTraits):
         )
         if self.attributes is not None:
             attributes["color"] = pythreejs.BufferAttribute(self.attributes)
+            # Face colors requires
+            # https://speakerdeck.com/yomotsu/low-level-apis-using-three-dot-js?slide=22
+            # and
+            # https://github.com/mrdoob/three.js/blob/master/src/renderers/shaders/ShaderLib.js
         geometry = pythreejs.BufferGeometry(attributes=attributes)
         geometry.exec_three_obj_method("computeFaceNormals")
         return geometry

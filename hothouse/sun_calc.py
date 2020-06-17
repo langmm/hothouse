@@ -9,6 +9,51 @@ import pandas as pd
 #FIX: figure out where this came from in old raytracer
 kSOLAR_constant = 2600
 
+
+def rotation_matrix(theta, u):
+    r"""Get the rotation matrix necessary to rotate a 3D point around
+    a unit vector by a specified angle.
+
+    Args:
+        theta (float): Angle to rotate by (in radians).
+        u (array): Vector to rotate around.
+
+    Returns
+        np.ndarray: Rotation matrix.
+
+    """
+    norm = np.linalg.norm(u)
+    assert(norm >= 1)
+    u = u / norm
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
+    inv_cos_theta = 1 - cos_theta
+    R = np.array(
+        [[cos_theta + (u[0] * u[0] * inv_cos_theta),
+          (u[0] * u[1] * inv_cos_theta) - (u[2] * sin_theta),
+          (u[0] * u[2] * inv_cos_theta) + (u[1] * sin_theta)],
+         [(u[1] * u[0] * inv_cos_theta) + (u[2] * sin_theta),
+          cos_theta + (u[1] * u[1] * inv_cos_theta),
+          (u[1] * u[2] * inv_cos_theta) - (u[0] * sin_theta)],
+         [(u[2] * u[0] * inv_cos_theta) - (u[1] * sin_theta),
+          (u[2] * u[1] * inv_cos_theta) + (u[0] * sin_theta),
+          cos_theta + (u[2] * u[2] * inv_cos_theta)]], dtype='f8')
+    return R
+
+
+def rotate_u(x, theta, u):
+    r"""Rotate a point arount an axis by an angle.
+
+    Args:
+
+    Returns:
+        array: Rotated x, y, z
+
+    """
+    R = rotation_matrix(theta, u)
+    return np.matmul(R, x)
+
+
 def sun_calcs(latitude, longitude, standard_meridian, day_of_year, hour_of_day):
     solar_noon = 12
     

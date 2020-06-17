@@ -2,7 +2,6 @@ import numpy as np
 import traittypes
 import traitlets
 from itertools import tee
-import quaternion
 import pythreejs
 
 from plyfile import PlyData, PlyElement

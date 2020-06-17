@@ -12,5 +12,5 @@ __version__ = get_versions()["version"]
 del get_versions
 
 from .plant_model import PlantModel
-from .blaster import OrthographicRayBlaster
+from .blaster import OrthographicRayBlaster, SunRayBlaster
 from .scene import Scene

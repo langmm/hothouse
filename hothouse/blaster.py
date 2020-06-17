@@ -4,8 +4,12 @@ import numpy as np
 import pyembree
 import traitlets
 import traittypes
+import datetime
+import pysolar
 
 from .traits_support import check_dtype, check_shape
+
+from hothouse import sun_calc
 
 # pyembree receives origins and directions.
 
@@ -75,6 +79,68 @@ class OrthographicRayBlaster(RayBlaster):
             + offset_y[..., None] * self.up
         )
         self.origins = self._origins.view().reshape((self.nx * self.ny, 3))
+
+
+class SunRayBlaster(OrthographicRayBlaster):
+    # ground: Position of center of ray projection on the ground
+    # zenith: Position directly above 'ground' at distance that sun
+    #     blaster should be placed.
+    # north: Direction of north on ground from 'ground'
+
+    latitude = traitlets.Float()
+    longitude = traitlets.Float()
+    date = traitlets.Instance(klass=datetime.datetime)
+    
+    ground = traittypes.Array().valid(check_dtype("f4"), check_shape(3))
+    zenith = traittypes.Array().valid(check_dtype("f4"), check_shape(3))
+    north = traittypes.Array().valid(check_dtype("f4"), check_shape(3))
+
+    def __init__(self, latitude, longitude, date,
+                 ground, zenith, north, **kwargs):
+        self.latitude = latitude
+        self.longitude = longitude
+        self.date = date
+        self.ground = ground
+        self.zenith = zenith
+        self.north = north
+        self.solar_altitude = pysolar.solar.get_altitude(
+            latitude, longitude, date)
+        self.solar_azimuth = pysolar.solar.get_azimuth(
+            latitude, longitude, date)
+        if self.solar_altitude < 0:
+            raise ValueError("For the provided lat, long, date, & time "
+                             "the sun will be below the horizon.")
+        zenith_direction = zenith - ground
+        solar_distance = np.linalg.norm(zenith_direction)
+        zenith_direction /= solar_distance
+        east = np.cross(north, zenith_direction)
+        forward = -sun_calc.rotate_u(
+            sun_calc.rotate_u(
+                zenith_direction,
+                np.radians(90 - self.solar_altitude),
+                north),
+            np.radians(90 - self.solar_azimuth),
+            zenith_direction)
+        center = ground - solar_distance * forward
+        up = -sun_calc.rotate_u(
+            sun_calc.rotate_u(
+                east,
+                np.radians(90 - self.solar_altitude),
+                north),
+            np.radians(90 - self.solar_azimuth),
+            zenith_direction)
+        # Adjust center so that rays don't start below ground
+        offset = 0.0
+        if 'height' in kwargs:
+            offset = max(
+                0,
+                ((kwargs['height'] / 2.0)
+                 - np.abs(np.linalg.norm(center - ground)
+                          * np.tan(np.radians(self.solar_altitude))))/2)
+        kwargs['center'] = center + offset * up
+        kwargs['forward'] = forward
+        kwargs['up'] = up
+        super(SunRayBlaster, self).__init__(**kwargs)
 
 
 class ProjectionRayBlaster(RayBlaster):

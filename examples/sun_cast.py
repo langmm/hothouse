@@ -5,10 +5,18 @@ import pytz
 import hothouse
 from hothouse.datasets import PLANTS
 from hothouse.scene import Scene
+from pvlib_model import sun_model
 
+
+ground = np.array([0.0, 0.0, 200.0], dtype='f4')
+up = np.array([0.0, 0.0, 1.0], dtype='f4')
+zenith = 300.0 * up
+north = np.array([0.0, 1.0, 0.0], dtype='f4')
+nx = 512
+ny = 512
 fname = PLANTS.fetch('fullSoy_2-12a.ply')
 p = hothouse.plant_model.PlantModel.from_ply(fname)
-s = Scene()
+s = Scene(ground=ground)
 s.add_component(p)
 
 # Champaign
@@ -23,31 +31,19 @@ date_sunset = datetime.datetime(2020, 6, 17, 19, 25, 0, 0,
                                 tzinfo=tz_champaign)
 
 date = date_sunrise
-ground = np.array([0.0, 0.0, 200.0], dtype='f4')
-zenith = np.array([0.0, 0.0, 300.0], dtype='f4')
-north = np.array([0.0, 1.0, 0.0], dtype='f4')
-nx = 512
-ny = 512
-width = 1024
-height = 1024
-rb = hothouse.SunRayBlaster(latitude=latitude_deg,
-                            longitude=longitude_deg,
-                            date=date,
-                            ground=ground,
-                            zenith=zenith,
-                            north=north,
-                            nx=nx, ny=ny,
-                            width=width, height=height)
+
+ppfd_tot = sun_model(latitude_deg, longitude_deg, date)  # W m-2
+hits = s.compute_solar_ppfd(latitude_deg, longitude_deg, date,
+                            ppfd_tot['direct'], ppfd_tot['diffuse'])
+
+# Plot the image seen by the sun blaster
+rb = s.get_sun_blaster(latitude_deg, longitude_deg, date,
+                       nx=nx, ny=ny)
 
 o = rb.compute_distance(s)
-# o = rb.cast_once(s)
 o[o > 1e35] = np.nan
 
 plt.clf()
 plt.imshow(o.reshape((ny, nx), order='F'), origin='lower')
 plt.colorbar()
 plt.savefig("distance.png")
-
-
-# output = s.compute_hit_count(rb)
-# import pdb; pdb.set_trace()

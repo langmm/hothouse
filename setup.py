@@ -21,7 +21,8 @@ requirements = [
     "numpy>=1.13.0",
     "traitlets",
     "traittypes",
-    "pysolar>=0.8",
+    "pvlib",
+    "tables",
     "pythreejs",
 ]
 

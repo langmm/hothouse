@@ -1,4 +1,5 @@
 import numpy as np
+import functools
 import traittypes
 import traitlets
 from itertools import tee
@@ -91,6 +92,18 @@ class Model(traitlets.HasTraits):
         geometry = pythreejs.BufferGeometry(attributes=attributes)
         geometry.exec_three_obj_method("computeFaceNormals")
         return geometry
+
+    @functools.cached_property
+    def norms(self):
+        r"""Array of the normal vectors for the triangles in this model."""
+        v10 = self.triangles[:, 1, :] - self.triangles[:, 0, :]
+        v20 = self.triangles[:, 2, :] - self.triangles[:, 0, :]
+        return np.cross(v10, v20)
+
+    @functools.cached_property
+    def areas(self):
+        r"""Array of areas for the triangles in this model."""
+        return 0.5 * np.linalg.norm(self.norms, axis=1)
 
     def translate(self, delta):
         self.vertices = self.vertices + delta

@@ -5,7 +5,7 @@ import pyembree
 import traitlets
 import traittypes
 import datetime
-import pysolar
+import pvlib
 
 from .traits_support import check_dtype, check_shape
 
@@ -103,10 +103,10 @@ class SunRayBlaster(OrthographicRayBlaster):
         self.ground = ground
         self.zenith = zenith
         self.north = north
-        self.solar_altitude = pysolar.solar.get_altitude(
-            latitude, longitude, date)
-        self.solar_azimuth = pysolar.solar.get_azimuth(
-            latitude, longitude, date)
+        solpos = pvlib.solarposition.get_solarposition(
+            date, latitude, longitude)
+        self.solar_altitude = solpos['apparent_elevation'][0]
+        self.solar_azimuth = solpos['azimuth'][0]
         if self.solar_altitude < 0:
             raise ValueError("For the provided lat, long, date, & time "
                              "the sun will be below the horizon.")

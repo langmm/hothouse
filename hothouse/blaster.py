@@ -126,57 +126,90 @@ class SunRayBlaster(OrthographicRayBlaster):
     latitude = traitlets.Float()
     longitude = traitlets.Float()
     date = traitlets.Instance(klass=datetime.datetime)
-    
+
     ground = traittypes.Array().valid(check_dtype("f4"), check_shape(3))
     zenith = traittypes.Array().valid(check_dtype("f4"), check_shape(3))
     north = traittypes.Array().valid(check_dtype("f4"), check_shape(3))
 
-    def __init__(self, latitude, longitude, date,
-                 ground, zenith, north, **kwargs):
-        self.latitude = latitude
-        self.longitude = longitude
-        self.date = date
-        self.ground = ground
-        self.zenith = zenith
-        self.north = north
-        solpos = pvlib.solarposition.get_solarposition(
-            date, latitude, longitude)
-        self.solar_altitude = solpos['apparent_elevation'][0]
-        self.solar_azimuth = solpos['azimuth'][0]
-        if self.solar_altitude < 0:
-            raise ValueError("For the provided lat, long, date, & time "
-                             "the sun will be below the horizon.")
-        zenith_direction = zenith - ground
-        solar_distance = np.linalg.norm(zenith_direction)
-        zenith_direction /= solar_distance
-        east = np.cross(north, zenith_direction)
+    solar_altitude = traitlets.CFloat()
+    solar_azimuth = traitlets.CFloat()
+    solar_distance = traitlets.CFloat()
+    _solpos_info = traittypes.DataFrame()
+
+    @traitlets.default("_solpos_info")
+    def _solpos_info_default(self):
+        return pvlib.solarposition.get_solarposition(
+            self.date, self.latitude, self.longitude
+        )
+
+    @traitlets.default("solar_altitude")
+    def _default_solar_altitude(self):
+        solar_altitude = self._solpos_info["apparent_elevation"][0]
+        if solar_altitude < 0:
+            raise ValueError(
+                "For the provided lat, long, date, & time "
+                "the sun will be below the horizon."
+            )
+        return solar_altitude
+
+    @traitlets.default("solar_azimuth")
+    def _default_solar_azimuth(self):
+        return self._solpos_info["azimuth"][0]
+
+    @property
+    def zenith_direction(self):
+        zd_nonorm = self.zenith - self.ground
+        solar_distance = np.linalg.norm(zd_nonorm)
+        print("sd zd", solar_distance, zd_nonorm)
+        return zd_nonorm / solar_distance
+
+    @traitlets.default("solar_distance")
+    def _solar_distance_default(self):
+        zd_nonorm = self.zenith - self.ground
+        return np.linalg.norm(zd_nonorm)
+
+    @traitlets.default("forward")
+    def _forward_default(self):
+        zenith_direction = self.zenith_direction  # only access once
         forward = -sun_calc.rotate_u(
             sun_calc.rotate_u(
-                zenith_direction,
-                np.radians(90 - self.solar_altitude),
-                north),
+                zenith_direction, np.radians(90 - self.solar_altitude), self.north
+            ),
             np.radians(90 - self.solar_azimuth),
-            zenith_direction)
-        center = ground - solar_distance * forward
+            zenith_direction,
+        )
+        return forward
+
+    @traitlets.default("center")
+    def _center_default(self):
+        v = self.ground - self.solar_distance * self.forward
+        offset = max(
+            0.0,
+            (
+                (self.height / 2.0)
+                - np.abs(
+                    np.linalg.norm(v - self.ground)
+                    * np.tan(np.radians(self.solar_altitude))
+                )
+            )
+            / 2,
+        )
+        print(offset)
+        v = v + offset * self.up
+        return v
+
+    @traitlets.default("up")
+    def _up_default(self):
+        zenith_direction = self.zenith_direction
+        east = np.cross(self.north, self.zenith_direction)
+        # The "east" used here is not the "east" used elsewhere.
+        # This is the east wrt north etc, but we need an east for blasting from elsewhere.
         up = -sun_calc.rotate_u(
-            sun_calc.rotate_u(
-                east,
-                np.radians(90 - self.solar_altitude),
-                north),
+            sun_calc.rotate_u(east, np.radians(90 - self.solar_altitude), self.north),
             np.radians(90 - self.solar_azimuth),
-            zenith_direction)
-        # Adjust center so that rays don't start below ground
-        offset = 0.0
-        if 'height' in kwargs:
-            offset = max(
-                0,
-                ((kwargs['height'] / 2.0)
-                 - np.abs(np.linalg.norm(center - ground)
-                          * np.tan(np.radians(self.solar_altitude))))/2)
-        kwargs['center'] = center + offset * up
-        kwargs['forward'] = forward
-        kwargs['up'] = up
-        super(SunRayBlaster, self).__init__(**kwargs)
+            zenith_direction,
+        )
+        return up
 
 
 class ProjectionRayBlaster(RayBlaster):

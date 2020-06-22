@@ -2,6 +2,7 @@ import traittypes
 import traitlets
 import pythreejs
 import numpy as np
+import pvlib
 from IPython.core.display import display
 
 from .model import Model
@@ -67,6 +68,8 @@ class Scene(traitlets.HasTraits):
             SunRayBlaster: Blaster tuned to this scene.
 
         """
+        # TODO: Calculate direct/diffuse ppfd from lat/long/date
+        # using pvi if not provided
         max_distance2 = 0.0
         for c in self.components:
             max_distance2 = max(
@@ -79,6 +82,7 @@ class Scene(traitlets.HasTraits):
         kwargs.setdefault('intensity', (direct_ppfd
                                         * kwargs['width']
                                         * kwargs['height']))
+        kwargs.setdefault('diffuse_intensity', diffuse_ppfd)
         blaster = SunRayBlaster(latitude=latitude,
                                 longitude=longitude, date=date,
                                 ground=self.ground, north=self.north,
@@ -147,6 +151,13 @@ class Scene(traitlets.HasTraits):
                         component_fd[ci][idx_scene] += (
                             blaster.ray_intensity * np.cos(aoi)
                             / areas[idx_scene])
+                # Diffuse
+                # TODO: This assumes diffuse light comes from everywhere
+                tilt = np.arccos(
+                    np.dot(norms, self.up)
+                    / (2.0 * areas * np.linalg.norm(self.up)))
+                component_fd[ci] += pvlib.irradiance.isotropic(
+                    tilt, blaster.diffuse_intensity)
         return component_fd
 
     def _ipython_display_(self):

@@ -24,6 +24,7 @@ class RayBlaster(traitlets.HasTraits):
     origins = traittypes.Array().valid(check_shape(None, 3), check_dtype("f4"))
     directions = traittypes.Array().valid(check_shape(None, 3), check_dtype("f4"))
     intensity = traitlets.CFloat(1.0)
+    diffuse_intensity = traitlets.CFloat(0.0)
 
     @property
     def ray_intensity(self):
@@ -135,7 +136,7 @@ class SunRayBlaster(OrthographicRayBlaster):
     solar_azimuth = traitlets.CFloat()
     solar_distance = traitlets.CFloat()
     _solpos_info = traittypes.DataFrame()
-
+    
     @traitlets.default("_solpos_info")
     def _solpos_info_default(self):
         return pvlib.solarposition.get_solarposition(
@@ -168,17 +169,27 @@ class SunRayBlaster(OrthographicRayBlaster):
         zd_nonorm = self.zenith - self.ground
         return np.linalg.norm(zd_nonorm)
 
+    def solar_rotation(self, point):
+        r"""Rotate a point according to same rotation that moves
+        sun from the zenith to it location in the sky.
+
+        Args:
+            point (array): 3D point to rotate
+
+        """
+        return sun_calc.rotate_u(
+            sun_calc.rotate_u(
+                point,
+                np.radians(90 - self.solar_altitude),
+                self.north),
+            np.radians(90 - self.solar_azimuth),
+            self.zenith_direction)
+
     @traitlets.default("forward")
     def _forward_default(self):
-        zenith_direction = self.zenith_direction  # only access once
-        forward = -sun_calc.rotate_u(
-            sun_calc.rotate_u(
-                zenith_direction, np.radians(90 - self.solar_altitude), self.north
-            ),
-            np.radians(90 - self.solar_azimuth),
-            zenith_direction,
-        )
-        return forward
+        # Negative to point from sun to the earth rather than from
+        # eart to the sun
+        return -self.solar_rotation(self.zenith_direction)
 
     @traitlets.default("center")
     def _center_default(self):
@@ -201,16 +212,11 @@ class SunRayBlaster(OrthographicRayBlaster):
     @traitlets.default("up")
     def _up_default(self):
         zenith_direction = self.zenith_direction
-        east = np.cross(self.north, self.zenith_direction)
+        east = np.cross(self.north, zenith_direction)
         # The "east" used here is not the "east" used elsewhere.
         # This is the east wrt north etc, but we need an east for blasting from elsewhere.
-        up = -sun_calc.rotate_u(
-            sun_calc.rotate_u(east, np.radians(90 - self.solar_altitude), self.north),
-            np.radians(90 - self.solar_azimuth),
-            zenith_direction,
-        )
-        return up
-
+        return -self.solar_rotation(east)
+    
 
 class ProjectionRayBlaster(RayBlaster):
     pass

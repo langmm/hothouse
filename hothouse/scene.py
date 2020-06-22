@@ -5,7 +5,7 @@ import numpy as np
 from IPython.core.display import display
 
 from .model import Model
-from .blaster import RayBlaster, SunRayBlaster
+from .blaster import RayBlaster, OrthographicRayBlaster, SunRayBlaster
 from .traits_support import check_shape, check_dtype
 
 from pyembree import rtcore_scene as rtcs
@@ -41,7 +41,8 @@ class Scene(traitlets.HasTraits):
             )
         return component_counts
 
-    def get_sun_blaster(self, latitude, longitude, date, **kwargs):
+    def get_sun_blaster(self, latitude, longitude, date,
+                        direct_ppfd=1.0, diffuse_ppfd=1.0, **kwargs):
         r"""Get a sun blaster that is adjusted for this scene so that
         the blaster will never intercept a component in the scene. This
         distance is determined by computing the maximum distance of any
@@ -53,6 +54,14 @@ class Scene(traitlets.HasTraits):
             date (datetime.datetime): Time when PPFD should be calculated.
                 This determines the incidence angle of light from the
                 sun.
+            direct_ppfd (float, optional): Direct Photosynthetic
+                Photon Flux Density (PPFD) at the surface of the
+                Earth for the specified location and time. Defaults
+                to 1.0.
+            diffuse_ppfd (float, optional): Diffuse Photosynthetic
+                Photon Flux Density (PPFD) at the surface of the
+                Earth for the specified location and time. Defaults
+                to 1.0.
 
         Returns:
             SunRayBlaster: Blaster tuned to this scene.
@@ -67,52 +76,78 @@ class Scene(traitlets.HasTraits):
         kwargs.setdefault('zenith', self.up * max_distance)
         kwargs.setdefault('width', 2 * max_distance)
         kwargs.setdefault('height', 2 * max_distance)
+        kwargs.setdefault('intensity', (direct_ppfd
+                                        * kwargs['width']
+                                        * kwargs['height']))
         blaster = SunRayBlaster(latitude=latitude,
                                 longitude=longitude, date=date,
                                 ground=self.ground, north=self.north,
                                 **kwargs)
         return blaster
 
-    def compute_solar_ppfd(self, latitude, longitude, date,
-                           direct_ppfd, diffuse_ppfd, **kwargs):
-        r"""Compute the photosynthetic photon flux density (PPFD) on
-        each scene element from the sun.
+    def compute_flux_density(self, light_sources, any_direction=True):
+        r"""Compute the flux density on each scene element from a
+        set of light sources. Values will be calculated from the
+        'intensity' attribute of the light source blasters such that
+        the flux density will have units of
+
+            [intensity units] / [distance unit from scene] ** 2.
 
         Args:
-            latitude (float): Latitude (in degrees) of the scene.
-            longitude (float): Longitude (in degrees) of the scene.
-            date (datetime.datetime): Time when PPFD should be calculated.
-                This determines the incidence angle of light from the
-                sun.
-            direct_ppfd (float): Direct Photosynthetic Photon Flux
-                Density (PPFD) at the surface of the Earth for the
-                specified location and time.
-            diffuse_ppfd (float): Diffuse Photosynthetic Photon Flux
-                Density (PPFD) at the surface of the Earth for the
-                specified location and time.
+            light_sources (list): Set of RayBlasters used to determine
+                the light incident on scene elements.
+            any_direction (bool, optional): If True, light is deposited
+                on component reguardless of if the blaster rays hit the
+                front or back of a component surface. If False, light
+                is only deposited if the blaster rays hit the front.
+                Defaults to True.
 
         Returns:
-            dict: Mapping from scene component to an array of PPFD
-                values for each triangle in the component.
+            dict: Mapping from scene component to an array of flux
+                density values for each triangle in the component.
 
         """
-        blaster = self.get_sun_blaster(latitude, longitude, date)
-        counts = self.compute_hit_count(blaster)
-        component_ppfd = {}
-        direct_ppfd_per_ray = (
-            direct_ppfd * blaster.width * blaster.height
-            / (blaster.nx * blaster.ny))
+        if isinstance(light_sources, RayBlaster):
+            light_sources = [light_sources]
+        component_fd = {}
         for ci, component in enumerate(self.components):
-            norms = component.norms
-            areas = component.areas
-            aoi = np.arccos(
-                np.dot(norms, -blaster.forward)
-                / (2.0 * areas * np.linalg.norm(blaster.forward)))
-            aoi[aoi > np.pi/2] -= np.pi  # Side of leaf independent
-            ppfd = counts[ci] * direct_ppfd_per_ray * np.cos(aoi) / areas
-            component_ppfd[ci] = ppfd
-        return component_ppfd
-        
+            component_fd[ci] = np.zeros(component.triangles.shape[0], "f4")
+        for blaster in light_sources:
+            counts = blaster.compute_count(self)
+            any_hits = (counts["primID"] >= 0)
+            for ci, component in enumerate(self.components):
+                idx_hits = np.logical_and(counts["geomID"] == ci,
+                                          any_hits)
+                norms = component.norms
+                areas = component.areas
+                if isinstance(blaster, OrthographicRayBlaster):
+                    component_counts = np.bincount(
+                        counts["primID"][idx_hits],
+                        minlength=component.triangles.shape[0])
+                    aoi = np.arccos(
+                        np.dot(norms, -blaster.forward)
+                        / (2.0 * areas * np.linalg.norm(blaster.forward)))
+                    if any_direction:
+                        aoi[aoi > np.pi/2] -= np.pi
+                    else:
+                        aoi[aoi > np.pi/2] = 0
+                    component_fd[ci] += (
+                        component_counts * blaster.ray_intensity
+                        * np.cos(aoi) / areas)
+                else:
+                    # TODO: This loop can be removed if AOI is calculated
+                    # for each intersection by embree (or callback)
+                    for idx_ray in np.where(idx_hits)[0]:
+                        idx_scene = output["primID"][i]
+                        aoi = np.arccos(
+                            np.dot(norms[idx_scene],
+                                   -blaster.directions[idx_ray, :])
+                            / (2.0 * areas[idx_scene] * np.linalg.norm(
+                                blaster.directions[idx_ray, :])))
+                        component_fd[ci][idx_scene] += (
+                            blaster.ray_intensity * np.cos(aoi)
+                            / areas[idx_scene])
+        return component_fd
 
     def _ipython_display_(self):
         # This needs to actually display, which is not the same as returning a display.

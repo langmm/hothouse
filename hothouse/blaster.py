@@ -23,6 +23,12 @@ class QueryType(Enum):
 class RayBlaster(traitlets.HasTraits):
     origins = traittypes.Array().valid(check_shape(None, 3), check_dtype("f4"))
     directions = traittypes.Array().valid(check_shape(None, 3), check_dtype("f4"))
+    intensity = traitlets.Float(1.0)
+
+    @property
+    def ray_intensity(self):
+        r"""float: Intensity of single ray."""
+        return self.intensity / self.origins.shape[0]
 
     def cast_once(self, scene, verbose_output=False, query_type=QueryType.DISTANCE):
         output = scene.embree_scene.run(
@@ -44,6 +50,36 @@ class RayBlaster(traitlets.HasTraits):
             scene, verbose_output=True, query_type=QueryType.INTERSECT
         )
         return output
+
+    def compute_flux_density(self, scene, light_sources,
+                             any_direction=True):
+        r"""Compute the flux density on each scene element touched by
+        this blaster from a set of light sources.
+
+        Args:
+            scene (Scene): Scene to get flux density for.
+            light_sources (list): Set of RayBlasters used to determine
+                the light incident on scene elements.
+            any_direction (bool, optional): If True, the flux is deposited
+                on component reguardless of if the blaster ray hits the
+                front or back of a component surface. If False, flux
+                is only deposited if the blaster ray hits the front.
+                Defaults to True.
+
+        Returns:
+            array: Total flux density on surfaces intercepted by the
+                rays.
+
+        """
+        fd_scene = scene.compute_flux_density(
+            light_sources, any_direction=any_direction)
+        out = np.zeros(self.nx * self.ny, "f4")
+        camera_hits = self.compute_count(scene)
+        for ci, component in enumerate(scene.components):
+            idx_ci = np.where(camera_hits["geomID"] == ci)[0]
+            hits = camera_hits["primID"][idx_ci]
+            out[idx_ci[hits >= 0]] += fd_scene[ci][hits[hits >= 0]]
+        return out
 
 
 class OrthographicRayBlaster(RayBlaster):

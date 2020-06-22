@@ -23,7 +23,7 @@ class QueryType(Enum):
 class RayBlaster(traitlets.HasTraits):
     origins = traittypes.Array().valid(check_shape(None, 3), check_dtype("f4"))
     directions = traittypes.Array().valid(check_shape(None, 3), check_dtype("f4"))
-    intensity = traitlets.Float(1.0)
+    intensity = traitlets.CFloat(1.0)
 
     @property
     def ray_intensity(self):

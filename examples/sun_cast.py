@@ -25,9 +25,12 @@ def get_scene(name):
     elif name == 'sphere':
         ground = np.array([0.0, 0.0, -100.0], dtype='f4')
         fname = os.path.join('data', 'sphere.ply')
-        center = np.array([0.0, -100.0, 0], dtype='f4')
+        center = np.array([0.0, -300.0, 0], dtype='f4')
         forward = np.array([0.0, 1.0, 0.0], dtype='f4')
         up = np.array([0.0, 0.0, 1.0], dtype='f4')
+        # center = np.array([0.0, 0.0, 300], dtype='f4')
+        # forward = np.array([0.0, 0.0, -1.0], dtype='f4')
+        # up = np.array([0.0, 1.0, 0.0], dtype='f4')
         width = height = 400
     elif name == 'pyramid':
         ground = np.array([0.0, 0.0, 0.0], dtype='f4')

@@ -98,7 +98,7 @@ class Model(traitlets.HasTraits):
         return geometry
 
     @cached_property
-    def norms(self):
+    def normals(self):
         r"""Array of the normal vectors for the triangles in this model."""
         v10 = self.triangles[:, 1, :] - self.triangles[:, 0, :]
         v20 = self.triangles[:, 2, :] - self.triangles[:, 0, :]
@@ -107,7 +107,7 @@ class Model(traitlets.HasTraits):
     @cached_property
     def areas(self):
         r"""Array of areas for the triangles in this model."""
-        return 0.5 * np.linalg.norm(self.norms, axis=1)
+        return 0.5 * np.linalg.norm(self.normals, axis=1)
 
     def translate(self, delta):
         self.vertices = self.vertices + delta

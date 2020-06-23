@@ -122,7 +122,7 @@ class Scene(traitlets.HasTraits):
             for ci, component in enumerate(self.components):
                 idx_hits = np.logical_and(counts["geomID"] == ci,
                                           any_hits)
-                norms = component.norms
+                norms = component.normals
                 areas = component.areas
                 if isinstance(blaster, OrthographicRayBlaster):
                     component_counts = np.bincount(
@@ -134,7 +134,7 @@ class Scene(traitlets.HasTraits):
                     if any_direction:
                         aoi[aoi > np.pi/2] -= np.pi
                     else:
-                        aoi[aoi > np.pi/2] = 0
+                        aoi[aoi > np.pi/2] = np.pi  # No contribution
                     component_fd[ci] += (
                         component_counts * blaster.ray_intensity
                         * np.cos(aoi) / areas)
@@ -148,6 +148,10 @@ class Scene(traitlets.HasTraits):
                                    -blaster.directions[idx_ray, :])
                             / (2.0 * areas[idx_scene] * np.linalg.norm(
                                 blaster.directions[idx_ray, :])))
+                        if any_direction:
+                            aoi[aoi > np.pi/2] -= np.pi
+                        else:
+                            aoi[aoi > np.pi/2] = np.pi  # No contribution
                         component_fd[ci][idx_scene] += (
                             blaster.ray_intensity * np.cos(aoi)
                             / areas[idx_scene])
@@ -157,7 +161,7 @@ class Scene(traitlets.HasTraits):
                     np.dot(norms, self.up)
                     / (2.0 * areas * np.linalg.norm(self.up)))
                 component_fd[ci] += pvlib.irradiance.isotropic(
-                    tilt, blaster.diffuse_intensity)
+                    np.degrees(tilt), blaster.diffuse_intensity)
         return component_fd
 
     def _ipython_display_(self):

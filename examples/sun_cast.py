@@ -1,3 +1,6 @@
+import os
+import pandas as pd
+import argparse
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 import numpy as np
@@ -10,49 +13,57 @@ from hothouse.blaster import OrthographicRayBlaster
 from pvlib_model import sun_model
 
 
-# Create the scene
-ground = np.array([0.0, 0.0, 200.0], dtype='f4')
-fname = PLANTS.fetch('fullSoy_2-12a.ply')
-p = hothouse.plant_model.PlantModel.from_ply(fname)
-scene = Scene(ground=ground)
-scene.add_component(p)
+def get_scene(name):
+    r"""Get a scene for the specified name."""
+    if name == 'plant':
+        ground = np.array([0.0, 0.0, 200.0], dtype='f4')
+        fname = PLANTS.fetch('fullSoy_2-12a.ply')
+        center = np.array([-25.0, -100.0, 500], dtype='f4')
+        forward = np.array([0.25, 1.0, 0.0], dtype='f4')
+        up = np.array([0.0, 0.0, 1.0], dtype='f4')
+        width = height = 800
+    elif name == 'sphere':
+        ground = np.array([0.0, 0.0, -100.0], dtype='f4')
+        fname = os.path.join('data', 'sphere.ply')
+        center = np.array([0.0, -100.0, 0], dtype='f4')
+        forward = np.array([0.0, 1.0, 0.0], dtype='f4')
+        up = np.array([0.0, 0.0, 1.0], dtype='f4')
+        width = height = 400
+    elif name == 'pyramid':
+        ground = np.array([0.0, 0.0, 0.0], dtype='f4')
+        fname = os.path.join('data', 'pyramid.ply')
+        center = np.array([0.5, 0.5, 4.0], dtype='f4')
+        forward = np.array([0.0, 0.0, -1.0], dtype='f4')
+        up = np.array([0.0, 1.0, 0.0], dtype='f4')
+        # center = np.array([0.5, -5.0, 0.8], dtype='f4')
+        # forward = np.array([0.0, 1.0, 0.0], dtype='f4')
+        # up = np.array([0.0, 0.0, 1.0], dtype='f4')
+        width = height = 2
+    p = hothouse.plant_model.PlantModel.from_ply(fname)
+    scene = Scene(ground=ground)
+    scene.add_component(p)
+    # Camera
+    # center = np.array([0.0, 0.0, 800], dtype='f4')
+    # forward = np.array([0.0, 0.0, -1.0], dtype='f4')
+    # up = np.array([0.0, 1.0, 0.0], dtype='f4')
+    nx = ny = 1024
+    camera = OrthographicRayBlaster(center=center, forward=forward,
+                                    up=up, width=width, height=height,
+                                    nx=nx, ny=ny)
+    return scene, camera
+        
 
-
-# Location specifics for Champaign
-latitude_deg = 40.1164
-longitude_deg = -88.2434
-tz_champaign = pytz.timezone("America/Chicago")
-date_noon = datetime.datetime(2020, 6, 17, 12, 0, 0, 0,
-                              tzinfo=tz_champaign)
-date_sunrise = datetime.datetime(2020, 6, 17, 5, 23, 0, 0,
-                                 tzinfo=tz_champaign)
-date_sunset = datetime.datetime(2020, 6, 17, 19, 25, 0, 0,
-                                tzinfo=tz_champaign)
-date = date_sunrise
-
-
-def plot_light(scene, latitude_deg, longitude_deg, date,
-               fname="distance.png"):
+def plot_light(scene, camera, latitude_deg, longitude_deg, date,
+               fname="light.png"):
     # Solar radiation model including atmosphere
     ppfd_tot = sun_model(latitude_deg, longitude_deg, date)  # W m-2
-
 
     # Blaster representing the sun
     nx = ny = 1024
     sun = scene.get_sun_blaster(latitude_deg, longitude_deg, date,
-                                nx=nx, ny=ny, direct_ppfd=ppfd_tot['direct'],
+                                nx=nx, ny=ny,
+                                direct_ppfd=ppfd_tot['direct'],
                                 diffuse_ppfd=ppfd_tot['diffuse'])
-
-
-    # Camera
-    center = np.array([0.0, -100.0, 500], dtype='f4')
-    forward = np.array([0.0, 1.0, 0.0], dtype='f4')
-    up = np.array([0.0, 0.0, 1.0], dtype='f4')
-    nx = ny = sun.nx
-    width = height = 800
-    camera = OrthographicRayBlaster(center=center, forward=forward, up=up,
-                                    width=width, height=height,
-                                    nx=nx, ny=ny)
 
     # Compute flux density on scene from sun
     o = camera.compute_flux_density(scene, sun)
@@ -69,10 +80,40 @@ def plot_light(scene, latitude_deg, longitude_deg, date,
         plt.show()
 
 
-plot_light(scene, latitude_deg, longitude_deg, date)
+def iter_plot(scene, camera, latitude, longitude,
+              t_start, t_stop, n_step):
+    dates = pd.date_range(t_start, t_stop, periods=n_step)
+    for date in dates:
+        plot_light(scene, camera, latitude, longitude, date, fname=None)
 
 
-# for hr in np.linspace(5.3833, 19.4166, 10):
-#     date = datetime.datetime(2020, 6, 17, int(hr), int((60 * hr) % 60), 0, 0,
-#                              tzinfo=tz_champaign)
-#     plot_light(scene, latitude_deg, longitude_deg, date, fname=None)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--scene', default='plant',
+                        choices=['plant', 'sphere', 'pyramid'])
+    parser.add_argument('--iterate', action='store_true')
+    parser.add_argument('--nsteps', default=10, type=int)
+    # These default to the values for Champaign, IL
+    # Sunrise: 2020-06-17  5:23:00
+    # Sunset:  2020-06-17 19:25:00
+    parser.add_argument('--latitude', default=40.1164, type=float)
+    parser.add_argument('--longitude', default=-88.2434, type=float)
+    parser.add_argument('--timezone', default='America/Chicago')
+    parser.add_argument('--time', default='2020-06-17 5:23:00')
+    parser.add_argument('--start-time', default='2020-06-17 5:23:00')
+    parser.add_argument('--stop-time', default='2020-06-17 19:25:00')
+    args = parser.parse_args()
+
+    scene, camera = get_scene(args.scene)
+    timezone = pytz.timezone(args.timezone)
+    for k in ['start_time', 'stop_time', 'time']:
+        setattr(args, k, datetime.datetime.strptime(
+            getattr(args, k), "%Y-%m-%d %H:%M:%S").replace(
+                tzinfo=timezone))
+
+    if args.iterate:
+        iter_plot(scene, camera, args.latitude, args.longitude,
+                  args.start_time, args.stop_time, args.nsteps)
+    else:
+        plot_light(scene, camera, args.latitude, args.longitude,
+                   args.time)  # , fname=('%s.png' % args.scene))

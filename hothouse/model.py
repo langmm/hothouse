@@ -63,14 +63,16 @@ class Model(traitlets.HasTraits):
 
         xyz_vert = np.stack([vertices[ax] for ax in "xyz"], axis=-1)
         xyz_faces = np.stack(xyz_faces)
-        colors = np.stack(
-            [vertices["diffuse_{}".format(c)] for c in ("red", "green", "blue")],
-            axis=-1,
-        )
+        colors = None
+        if "diffuse_red" in vertices.dtype.names:
+            colors = np.stack(
+                [vertices["diffuse_{}".format(c)] for c in ("red", "green", "blue")],
+                axis=-1,
+            )
         triangles = np.array(triangles).swapaxes(1, 2)
         obj = cls(
             vertices=xyz_vert,
-            indices=xyz_faces,
+            indices=xyz_faces.astype('i4'),
             attributes=colors,
             triangles=triangles,
         )

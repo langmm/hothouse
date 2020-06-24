@@ -73,12 +73,11 @@ def append_embree_info(exts):
         embree_lib_name = "embree"
 
     for ext in exts:
-        ext.include_dirs += embree_inc_dir
+        ext.include_dirs += embree_inc_dir + [numpy.get_include()]
         ext.library_dirs += embree_lib_dir
         ext.language = "c++"
         ext.libraries += std_libs
         ext.libraries += [embree_lib_name]
-        print(ext.include_dirs, ext.library_dirs)
 
     return exts
 
@@ -115,7 +114,5 @@ setup(
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     zip_safe=False,
-    ext_modules=append_embree_info(
-        cythonize("**/*.pyx", include_path=[numpy.get_include()])
-    ),
+    ext_modules=append_embree_info(cythonize("**/*.pyx")),
 )

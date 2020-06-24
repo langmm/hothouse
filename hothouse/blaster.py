@@ -10,7 +10,7 @@ import pvlib
 from .traits_support import check_dtype, check_shape
 
 from hothouse import sun_calc
-from .scene_with_callbacks import RayCollisionPrinter
+from .ray_callbacks import RayCollisionPrinter
 
 # pyembree receives origins and directions.
 

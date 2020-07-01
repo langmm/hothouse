@@ -201,11 +201,12 @@ class Scene(traitlets.HasTraits):
                             any_direction=any_direction))
             # Diffuse
             # TODO: This assumes diffuse light comes from everywhere
-            tilt = np.arccos(
-                np.dot(norms, self.up)
-                / (2.0 * areas * np.linalg.norm(self.up)))
-            component_fd[ci] += pvlib.irradiance.isotropic(
-                np.degrees(tilt), diffuse_intensity)
+            if diffuse_intensity > 0.0:
+                tilt = np.arccos(
+                    np.dot(norms, self.up)
+                    / (2.0 * areas * np.linalg.norm(self.up)))
+                component_fd[ci] += pvlib.irradiance.isotropic(
+                    np.degrees(tilt), diffuse_intensity)
 
     def _ipython_display_(self):
         # This needs to actually display, which is not the same as returning a display.

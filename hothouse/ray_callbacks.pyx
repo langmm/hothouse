@@ -55,20 +55,20 @@ cdef class RayCollisionMultiBounce(RayCollisionCallback):
         nz = ray.Ng[2] / nu
 	# Rotate inverse of original direction 180 deg around surface
 	# normal to get new direction
-        new_dir[0] = -(ray.dir[0] * (-1.0 - (2.0 * nx * nx))
-                       + ray.dir[1] * (-2.0 * nx * ny)
-                       + ray.dir[2] * (-2.0 * nx * nz))
-        new_dir[1] = -(ray.dir[0] * (-2.0 * ny * nx)
-                       + ray.dir[1] * (-1.0 - (2.0 * ny * ny))
-                       + ray.dir[2] * (-2.0 * ny * nz))
-        new_dir[2] = -(ray.dir[0] * (-2.0 * nz * nx)
-                       + ray.dir[1] * (-2.0 * nz * ny)
-                       + ray.dir[2] * (-1.0 - (2.0 * nz * nz)))
+        new_dir[0] = -(ray.dir[0] * (-1.0 + (2.0 * nx * nx))
+                       + ray.dir[1] * (2.0 * nx * ny)
+                       + ray.dir[2] * (2.0 * nx * nz))
+        new_dir[1] = -(ray.dir[0] * (2.0 * ny * nx)
+                       + ray.dir[1] * (-1.0 + (2.0 * ny * ny))
+                       + ray.dir[2] * (2.0 * ny * nz))
+        new_dir[2] = -(ray.dir[0] * (2.0 * nz * nx)
+                       + ray.dir[1] * (2.0 * nz * ny)
+                       + ray.dir[2] * (-1.0 + (2.0 * nz * nz)))
         for i in range(3):
             ray.dir[i] = new_dir[i]
             # Offset origin slightly along new path to prevent
             # intersecting at new origin
-            ray.org[i] = ray.org[i] + 2.0 * ray.dir[i] * np.finfo(np.float32).eps
+            ray.org[i] = ray.org[i] + 1000.0 * ray.dir[i] * np.finfo(np.float32).eps
 
     @property
     def bounces(self):

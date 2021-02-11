@@ -1,0 +1,34 @@
+model:
+  name: hothouse
+  language: python
+  args: ../sun_cast.py
+  function: compute_par
+  inputs:
+    - name: geometry
+      default_value: '../../data/sphere.ply'
+      # default_file:
+      #   name: ../../data/sphere.ply
+      #   filetype: ply
+      #   ground: [0.0, 0.0, -100.0]
+      outside_loop: true
+    - name: location
+      default_file:
+        name: ../../data/champaign.yml
+        filetype: yaml
+      outside_loop: true
+    - name: date
+      default_value: '2020-06-17 5:23:00'
+      count: 2
+    - name: resolution
+      default_value: 1024
+      outside_loop: true
+    - name: ground
+      default_value: [0.0, 0.0, -100.0]
+      outside_loop: true
+  outputs:
+    - name: ppfd
+      default_file:
+        name: ppfd_%d.txt
+        filetype: json
+        is_series: true
+        field_names: [ppfd]

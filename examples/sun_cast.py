@@ -11,6 +11,7 @@ from hothouse.datasets import PLANTS
 from hothouse.scene import Scene
 from hothouse.blaster import OrthographicRayBlaster
 from pvlib_model import sun_model
+from timezonefinder import TimezoneFinder
 
 
 def get_scene(name):
@@ -54,7 +55,7 @@ def get_scene(name):
                                     up=up, width=width, height=height,
                                     nx=nx, ny=ny)
     return scene, camera
-        
+
 
 def plot_light(scene, camera, latitude_deg, longitude_deg, date,
                fname="light.png"):
@@ -88,6 +89,37 @@ def iter_plot(scene, camera, latitude, longitude,
     dates = pd.date_range(t_start, t_stop, periods=n_step)
     for date in dates:
         plot_light(scene, camera, latitude, longitude, date, fname=None)
+
+
+def compute_par(geometry, location, date, resolution=1024,
+                ground=np.array([0.0, 0.0, 0.0], dtype='f4')):
+    tf = TimezoneFinder()
+    longitude = location['longitude']
+    latitude = location['latitude']
+    timezone = location.get('timezone', None)
+    if timezone is None:
+        timezone = tf.timezone_at(lng=longitude, lat=latitude)
+    timezone = pytz.timezone(timezone)
+    date = datetime.datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(
+        tzinfo=timezone)
+    if isinstance(ground, list):
+        ground = np.array(ground, dtype='f4')
+    # TODO: Convert geometry to model based on type
+    if isinstance(geometry, str):
+        p = hothouse.plant_model.PlantModel.from_ply(geometry)
+    else:
+        raise TypeError("Unsupported geometry type: %s" % type(geometry))
+    scene = Scene(ground=ground)
+    scene.add_component(p)
+    # Solar radiation model including atmosphere
+    ppfd_tot = sun_model(latitude, longitude, date)
+    # Blaster representing the sun
+    nx = ny = resolution
+    sun = scene.get_sun_blaster(latitude, longitude, date, nx=nx, ny=ny,
+                                direct_ppfd=ppfd_tot['direct'],
+                                diffuse_ppfd=ppfd_tot['diffuse'])
+    ppfd = [scene.compute_flux_density(sun)[0]]
+    return ppfd
 
 
 if __name__ == "__main__":
